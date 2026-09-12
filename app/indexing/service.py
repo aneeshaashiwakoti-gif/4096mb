@@ -9,6 +9,7 @@ deterministic extractors below remain available for every supported language.
 from __future__ import annotations
 
 import ast
+import difflib
 import hashlib
 import os
 import re
@@ -21,6 +22,7 @@ from app.indexing.languages import detect_language, is_binary_file
 from app.config import settings
 from app.models.common import EvidenceSnippet
 from app.models.requests import ChangeDetail, ImpactAnalysisInput, ImpactedComponent
+from app.models.intelligence import ChangeRecord, RetrievalRecord, SymbolRecord
 
 IGNORED_DIRECTORIES = {
     ".git", "node_modules", "venv", ".venv", "__pycache__", "dist", "build",
@@ -86,6 +88,7 @@ class ProjectIndex:
         self.files_by_symbol: dict[str, set[str]] = defaultdict(set)
         self.reverse_dependencies: dict[str, set[str]] = defaultdict(set)
         self.file_hashes: dict[str, str] = {}
+        self.file_contents: dict[str, str] = {}
         self.tree_sitter_files = 0
         self.retriever = None
         self.vector_status = "disabled"
@@ -107,6 +110,7 @@ class ProjectIndex:
         self.files_by_symbol.clear()
         self.reverse_dependencies.clear()
         self.file_hashes.clear()
+        self.file_contents.clear()
         self.tree_sitter_files = 0
         self.retriever = self._new_retriever()
         self.status = "indexing"
@@ -121,9 +125,15 @@ class ProjectIndex:
             self.vector_status = "disabled"
             return None
         try:
-            from retrieval_storage_2.retrieval import CodebaseRetriever
-            self.vector_status = "building"
-            return CodebaseRetriever()
+            from retrieval_storage_2.retrieval import CodebaseRetriever, EmbeddingProvider
+            # Person 2's retriever remains the one search implementation. In
+            # a clean offline install use its deterministic embedding fallback
+            # explicitly, avoiding an implicit model download. Configured
+            # Gemini credentials use the matching real embedding space.
+            has_gemini_key = bool(settings.GEMINI_API_KEY and not settings.GEMINI_API_KEY.startswith("your-"))
+            backend = "gemini" if has_gemini_key else "offline"
+            self.vector_status = "building" if backend == "gemini" else "building_offline"
+            return CodebaseRetriever(embedding_provider=EmbeddingProvider(backend=backend))
         except Exception as exc:
             self.vector_status = f"unavailable: {type(exc).__name__}"
             self.last_error = f"Vector retrieval unavailable: {exc}"
@@ -302,30 +312,60 @@ class ProjectIndex:
     def update_file(self, file_path: Path) -> dict:
         relative = self._relative(file_path)
         if not file_path.exists() or not self.is_indexable(file_path):
-            self.remove_file(relative)
-            return {"action": "removed", "file": relative}
+            return self.remove_file(relative)
         raw = file_path.read_bytes()
         digest = hashlib.sha256(raw).hexdigest()
         if self.file_hashes.get(relative) == digest:
-            return {"action": "unchanged", "file": relative}
+            return {"action": "unchanged", "file": relative,
+                    "change": ChangeRecord(path=relative, change_type="unchanged").model_dump(mode="json")}
+        old_content = self.file_contents.get(relative)
         source = raw.decode("utf-8", errors="replace")
         chunks = self._extract_chunks(relative, source)
         self.chunks_by_file[relative] = chunks
         self.imports_by_file[relative] = set(imported for chunk in chunks for imported in chunk.imports)
         self.references_by_file[relative] = set(reference for chunk in chunks for reference in chunk.references)
         self.file_hashes[relative] = digest
+        self.file_contents[relative] = source
         self._sync_vector_file(relative, chunks)
         self._rebuild_relationships()
-        return {"action": "indexed", "file": relative, "chunks": len(chunks)}
+        kind = "created" if old_content is None else "modified"
+        return {"action": "indexed", "file": relative, "chunks": len(chunks),
+                "change": ChangeRecord(path=relative, change_type=kind, old_content=old_content,
+                    new_content=source, changed_lines=self._changed_lines(old_content or "", source)).model_dump(mode="json")}
 
-    def remove_file(self, relative: str) -> None:
+    @staticmethod
+    def _changed_lines(old_content: str, new_content: str) -> list[int]:
+        changed: set[int] = set()
+        matcher = difflib.SequenceMatcher(a=old_content.splitlines(), b=new_content.splitlines())
+        for tag, _old_start, _old_end, new_start, new_end in matcher.get_opcodes():
+            if tag != "equal":
+                changed.update(range(new_start + 1, max(new_start + 2, new_end + 1)))
+        return sorted(changed)
+
+    def remove_file(self, relative: str) -> dict:
+        old_content = self.file_contents.get(relative)
         self.chunks_by_file.pop(relative, None)
         self.imports_by_file.pop(relative, None)
         self.references_by_file.pop(relative, None)
         self.file_hashes.pop(relative, None)
+        self.file_contents.pop(relative, None)
         if self.retriever:
             self.retriever.chunks = [chunk for chunk in self.retriever.chunks if chunk.file_path != relative]
         self._rebuild_relationships()
+        return {"action": "removed", "file": relative,
+                "change": ChangeRecord(path=relative, change_type="deleted", old_content=old_content,
+                    changed_lines=list(range(1, (old_content or "").count("\n") + 2))).model_dump(mode="json")}
+
+    def rename_file(self, old_relative: str, new_path: Path) -> dict:
+        """Carry Person 1 rename metadata through the incremental Person 2 update."""
+        old_content = self.file_contents.get(old_relative)
+        self.remove_file(old_relative)
+        result = self.update_file(new_path)
+        new_relative = self._relative(new_path)
+        result["change"] = ChangeRecord(path=new_relative, old_path=old_relative, change_type="renamed",
+            old_content=old_content, new_content=self.file_contents.get(new_relative),
+            changed_lines=self._changed_lines(old_content or "", self.file_contents.get(new_relative, ""))).model_dump(mode="json")
+        return result
 
     def search(self, query: str, limit: int = 8) -> list[dict]:
         if self.retriever:
@@ -357,6 +397,17 @@ class ProjectIndex:
                     item["retrieval"] = "deterministic"
                     scored.append(item)
         return sorted(scored, key=lambda item: (-item["score"], item["file_path"], item["start_line"]))[:limit]
+
+    def retrieval_records(self, query: str, limit: int = 8) -> list[RetrievalRecord]:
+        return [RetrievalRecord(chunk_id=item["chunk_id"], file=item["file_path"], symbol=item.get("symbol"),
+            start_line=item["start_line"], end_line=item["end_line"], content=item["content"],
+            score=float(item["score"]), source=item["retrieval"]) for item in self.search(query, limit)]
+
+    def symbols(self, file_path: str | None = None) -> list[SymbolRecord]:
+        chunks = self.chunks_by_file.get(file_path, []) if file_path else [chunk for group in self.chunks_by_file.values() for chunk in group]
+        return [SymbolRecord(symbol_id=chunk.chunk_id, file=chunk.file_path, name=chunk.symbol or chunk.file_path,
+            type=chunk.symbol_type, parent=chunk.parent_symbol, start_line=chunk.start_line, end_line=chunk.end_line)
+            for chunk in chunks]
 
     def evidence_for_query(self, query: str, limit: int = 8) -> list[EvidenceSnippet]:
         return [EvidenceSnippet(file=item["file_path"], start_line=item["start_line"], end_line=item["end_line"],

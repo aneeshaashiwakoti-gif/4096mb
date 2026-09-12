@@ -90,4 +90,12 @@ export const api = {
   searchProject(query, limit = 8) {
     return request('GET', `/projects/search?query=${encodeURIComponent(query)}&limit=${limit}`);
   },
+
+  auditPr(payload) {
+    return request('POST', '/pr/audit', payload);
+  },
+
+  driftTrend() {
+    return request('GET', '/drift-trend');
+  },
 };

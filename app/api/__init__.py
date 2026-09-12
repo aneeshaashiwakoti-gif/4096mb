@@ -7,6 +7,7 @@ from app.api.ask import router as ask_router
 from app.api.fix import router as fix_router
 from app.api.validation import router as validation_router
 from app.api.project import router as project_router
+from app.api.audit import router as audit_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["Health"])
@@ -15,5 +16,6 @@ api_router.include_router(ask_router, tags=["Assistant"])
 api_router.include_router(fix_router, prefix="/fix", tags=["Fix Proposals"])
 api_router.include_router(validation_router, tags=["Validation & Re-analysis"])
 api_router.include_router(project_router, tags=["Projects"])
+api_router.include_router(audit_router, tags=["Audit"])
 
 __all__ = ["api_router"]

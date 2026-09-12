@@ -38,20 +38,28 @@ def _http_error(error: Exception) -> HTTPException:
     return HTTPException(status_code=400 if "outside" not in message else 403, detail=message)
 
 
-async def broadcast_file_change(file_path: str, change_type: str = "modified") -> None:
+async def broadcast_file_change(file_path: str, change_type: str = "modified", old_path: str | None = None) -> None:
     """Tell clients only after the local index has been incrementally updated."""
-    if project_index.connected and change_type != "deleted":
+    change = None
+    if project_index.connected and change_type == "renamed" and old_path:
         try:
-            project_index.update_file(project_index.resolve(file_path))
+            result = project_index.rename_file(old_path, project_index.resolve(file_path))
+            change = result["change"]
+        except (ValueError, OSError):
+            return
+    elif project_index.connected and change_type != "deleted":
+        try:
+            result = project_index.update_file(project_index.resolve(file_path))
+            change = result.get("change")
         except (ValueError, OSError):
             return
     elif change_type == "deleted":
-        project_index.remove_file(file_path)
+        change = project_index.remove_file(file_path).get("change")
     try:
         impact = project_index.impact(file_path).model_dump(mode="json") if change_type != "deleted" else None
     except ValueError:
         impact = None
-    message = json.dumps({"type": "file_event", "file": file_path, "change_type": change_type,
+    message = json.dumps({"type": "file_event", "file": file_path, "change_type": change_type, "change": change,
                           "index_status": project_index.index_status(), "impact": impact})
     stale = []
     for connection in active_connections:
@@ -91,6 +99,16 @@ try:
         def on_deleted(self, event):
             if not event.is_directory:
                 self._notify(event.src_path, "deleted")
+
+        def on_moved(self, event):
+            if event.is_directory or not event_loop or not project_index.root:
+                return
+            try:
+                old_relative = project_index._relative(Path(event.src_path))
+                new_relative = project_index._relative(Path(event.dest_path))
+            except ValueError:
+                return
+            asyncio.run_coroutine_threadsafe(broadcast_file_change(new_relative, "renamed", old_relative), event_loop)
 except ImportError:
     Observer = None
     ProjectWatcher = None
@@ -103,27 +121,49 @@ class PollingProjectWatcher:
         self._snapshot: dict[str, tuple[int, int]] = {}
         self._thread: threading.Thread | None = None
 
+    @staticmethod
+    def _scan() -> dict[str, tuple[int, int]]:
+        current: dict[str, tuple[int, int]] = {}
+        for path in project_index.scan_files():
+            try:
+                relative = project_index._relative(path)
+                stat = path.stat()
+                current[relative] = (stat.st_mtime_ns, stat.st_size)
+            except OSError:
+                continue
+        return current
+
     def start(self) -> None:
+        # Start from the current filesystem state: connecting a project must
+        # not emit a misleading "created" event for every pre-existing file.
+        self._snapshot = self._scan()
         def run() -> None:
             while not self._stop.wait(0.5):
-                current: dict[str, tuple[int, int]] = {}
-                for path in project_index.scan_files():
-                    try:
-                        relative = project_index._relative(path)
-                        stat = path.stat()
-                        current[relative] = (stat.st_mtime_ns, stat.st_size)
-                    except OSError:
-                        continue
+                current = self._scan()
+                removed = set(self._snapshot) - set(current)
+                created = set(current) - set(self._snapshot)
+                # A rename keeps the same mtime/size fingerprint. Pair these
+                # before emitting create/delete so Person 2 can preserve the
+                # single incremental change record.
+                for old_relative in list(removed):
+                    match = next((new_relative for new_relative in created
+                                  if current[new_relative] == self._snapshot[old_relative]), None)
+                    if match is not None:
+                        if event_loop:
+                            asyncio.run_coroutine_threadsafe(
+                                broadcast_file_change(match, "renamed", old_relative), event_loop)
+                        removed.remove(old_relative)
+                        created.remove(match)
                 for relative, fingerprint in current.items():
-                    if relative not in self._snapshot:
+                    if relative in created:
                         kind = "created"
-                    elif self._snapshot[relative] != fingerprint:
+                    elif relative in self._snapshot and self._snapshot[relative] != fingerprint:
                         kind = "modified"
                     else:
                         continue
                     if event_loop:
                         asyncio.run_coroutine_threadsafe(broadcast_file_change(relative, kind), event_loop)
-                for relative in set(self._snapshot) - set(current):
+                for relative in removed:
                     if event_loop:
                         asyncio.run_coroutine_threadsafe(broadcast_file_change(relative, "deleted"), event_loop)
                 self._snapshot = current
@@ -210,6 +250,13 @@ def search(query: str = Query(..., min_length=1), limit: int = Query(8, ge=1, le
     if not project_index.connected:
         raise HTTPException(status_code=400, detail="No active project")
     return {"query": query, "results": project_index.search(query, limit)}
+
+
+@router.get("/projects/symbols")
+def symbols(file: Optional[str] = None):
+    if not project_index.connected:
+        raise HTTPException(status_code=400, detail="No active project")
+    return {"symbols": [symbol.model_dump() for symbol in project_index.symbols(file)]}
 
 
 @router.get("/project/dependencies")

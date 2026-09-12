@@ -63,3 +63,14 @@ __all__ = [
     "CitationVerificationResult",
     "ReanalyzeResponse",
 ]
+from app.models.intelligence import (
+    AuditFinding, AuditRequest, AuditResponse, ChangeRecord, DriftPoint,
+    DriftResponse, FileRecord, ProjectRecord, RelationshipRecord,
+    RetrievalRecord, SymbolRecord,
+)
+
+__all__ += [
+    "AuditFinding", "AuditRequest", "AuditResponse", "ChangeRecord",
+    "DriftPoint", "DriftResponse", "FileRecord", "ProjectRecord",
+    "RelationshipRecord", "RetrievalRecord", "SymbolRecord",
+]

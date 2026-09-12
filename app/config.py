@@ -39,7 +39,8 @@ class Settings(BaseSettings):
     VECTOR_STORE_DB: str = "output/vector_store.db"
     # Enables Person 2's existing embedding retriever for the live project
     # index. Disabled by default so a local project works offline.
-    VECTOR_RETRIEVAL_ENABLED: bool = False
+    VECTOR_RETRIEVAL_ENABLED: bool = True
+    HISTORICAL_SNAPSHOTS_MANIFEST: str = "output/snapshots/manifest.json"
 
     model_config = SettingsConfigDict(
         env_file=".env",

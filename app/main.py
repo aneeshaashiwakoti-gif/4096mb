@@ -1,8 +1,10 @@
 """Main FastAPI Application Entrypoint for CodeImpact Person 3 Backend."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api import api_router
 from app.config import settings
@@ -48,6 +50,13 @@ def create_app() -> FastAPI:
 
     # Register API routes
     app.include_router(api_router)
+
+    # The Vite build is optional for API-only deployments. When it is present,
+    # host the existing Sentinel frontend from the same localhost origin so the
+    # browser can open the application directly at http://127.0.0.1:8000/.
+    frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+    if frontend_dist.is_dir():
+        app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
 
     return app
 

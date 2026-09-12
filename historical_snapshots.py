@@ -42,6 +42,18 @@ logging.basicConfig(
 logger = logging.getLogger("snapshots")
 
 
+def duplication_score(chunks: List[Any]) -> float:
+    """Return the exact-normalized duplicate ratio for one historical snapshot.
+
+    This stable metric is intentionally recorded alongside each snapshot so
+    `/drift-trend` can compare commits without re-reading every chunk file.
+    """
+    normalized = [" ".join(chunk.text.split()) for chunk in chunks if chunk.text.strip()]
+    if not normalized:
+        return 0.0
+    return round(1.0 - (len(set(normalized)) / len(normalized)), 6)
+
+
 def get_commit_history(repo_path: Path) -> List[str]:
     """Return all commit hashes in chronological order (oldest to newest)."""
     res = subprocess.run(
@@ -195,6 +207,7 @@ def run_snapshots(
                     "message": meta["message"],
                     "file_count": len(files),
                     "chunk_count": len(all_chunks),
+                    "duplication_score": duplication_score(all_chunks),
                     "embedding_backend": "local",
                     "embedding_dimension": 384,
                     "output_file": out_filename,
