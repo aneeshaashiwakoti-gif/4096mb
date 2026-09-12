@@ -67,8 +67,11 @@ cd C:\Users\Nitisha\.gemini\antigravity\scratch\codeimpact\backend
 pip install -r requirements.txt
 ```
 
----
-
+You'll see:
+- Number of chunks produced
+- A text preview of chunk 0 with its file path and line range
+- Embedding dimension (3072 for Gemini gemini-embedding-2 / gemini-embedding-001, 384 for local)
+- `output/chunks.json` written
 ## 4. Environment Variables & Configuration
 
 Copy `.env.example` to `.env`:

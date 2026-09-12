@@ -31,11 +31,9 @@ htmlcov/
 .idea/
 *.swp
 *.swo
+output/
 frontend/node_modules/
 frontend/dist/
-output/*
-!output/snapshots/
-!output/snapshots/manifest.json
 nanoGPT/
 click/
 click_snapshots/

@@ -26,6 +26,7 @@ try:
         EmbeddingProvider,
         SearchResult,
         StorageLoader,
+        _pure_cosine_similarity,
         cosine_similarity,
         init_retriever,
         search,
@@ -37,6 +38,7 @@ except ImportError:
         EmbeddingProvider,
         SearchResult,
         StorageLoader,
+        _pure_cosine_similarity,
         cosine_similarity,
         init_retriever,
         search,
@@ -59,6 +61,26 @@ def test_cosine_similarity_math():
     score_opp = cosine_similarity(v1, v4)
     val_opp = score_opp[0] if isinstance(score_opp, (list, tuple)) or hasattr(score_opp, "__getitem__") else score_opp
     assert math.isclose(float(val_opp), -1.0, rel_tol=1e-5)
+
+
+def test_vector_dimension_mismatch_raises_error():
+    """Verify that comparing vectors of different dimensions raises a ValueError instead of silently truncating."""
+    v_3072 = [0.1] * 3072
+    v_768 = [0.1] * 768
+
+    # Pure Python check
+    try:
+        _pure_cosine_similarity(v_768, v_3072)
+        assert False, "Expected ValueError on dimension mismatch in _pure_cosine_similarity"
+    except ValueError as exc:
+        assert "dimension mismatch" in str(exc).lower()
+
+    # Vectorized / Numpy check
+    try:
+        cosine_similarity(v_768, [v_3072])
+        assert False, "Expected ValueError on dimension mismatch in cosine_similarity"
+    except ValueError as exc:
+        assert "dimension mismatch" in str(exc).lower()
 
 
 def test_storage_json_roundtrip():
@@ -111,9 +133,9 @@ def test_retriever_search_ranking():
     assert len(results_auth) == 2
     assert "auth" in results_auth[0].file_path
 
-    results_db = retriever.search("how does the database connection work?", top_k=2)
-    # The dummy/fallback embedder might return different results, so we just check it returns something
-    assert len(results_db) >= 1
+    results_db = retriever.search("how does the database connection work?", top_k=1)
+    assert len(results_db) == 1
+    assert "database" in results_db[0].file_path
 
     results_pay = retriever.search("how is stripe charge and payment processed?", top_k=1)
     assert len(results_pay) == 1
@@ -144,8 +166,10 @@ def test_search_output_contract_for_person_3():
 
 if __name__ == "__main__":
     test_cosine_similarity_math()
+    test_vector_dimension_mismatch_raises_error()
     test_storage_json_roundtrip()
     test_storage_sqlite_roundtrip()
     test_retriever_search_ranking()
     test_search_output_contract_for_person_3()
     print("All Person 2 tests passed successfully!")
+

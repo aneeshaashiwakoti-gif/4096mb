@@ -1,9 +1,9 @@
 """
-embedder.py — Attach embedding vectors to Chunk objects.
+embedder.py — Attach embedding vectors to Chunk objects and embed search queries.
 
 Supports two backends (set via EMBEDDING_BACKEND env var):
-  • "gemini"  — Gemini text-embedding-004 via REST API (no SDK required)
-  • "local"   — sentence-transformers all-MiniLM-L6-v2  (fully offline)
+  • "gemini"  — Google Gemini gemini-embedding-2 / gemini-embedding-001 (3072-dim, REST API)
+  • "local"   — sentence-transformers all-MiniLM-L6-v2 (384-dim, fully offline)
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import List
+from typing import List, Optional
 
 from chunker import Chunk
 
@@ -216,3 +216,103 @@ def embed_chunks(
         )
 
     return chunks
+
+
+def embed_query(query: str, backend: Optional[str] = None) -> List[float]:
+    """
+    Generate an embedding vector for a single query string.
+    Ensures that retrieval queries share the exact same model, backend,
+    and vector space as the stored document chunks.
+
+    Args:
+        query:   The user question or retrieval query text.
+        backend: "gemini" or "local" (defaults to EMBEDDING_BACKEND env var).
+
+    Returns:
+        A list of floats (3072-dim for gemini, 384-dim for local).
+    """
+    if backend is None:
+        backend = os.getenv("EMBEDDING_BACKEND", "gemini")
+
+    if backend == "local":
+        return _embed_local([query])[0]
+
+    if backend == "gemini":
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        if not api_key:
+            raise EnvironmentError(
+                "EMBEDDING_BACKEND=gemini but GEMINI_API_KEY is not set."
+            )
+
+        import requests
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+        session = requests.Session()
+        session.verify = False
+
+        model = os.getenv("GEMINI_EMBEDDING_MODEL", _DEFAULT_GEMINI_MODEL)
+
+        # Quick probe check if primary model hit daily quota
+        probe_url = f"https://generativelanguage.googleapis.com/v1beta/{model}:batchEmbedContents"
+        probe_payload = {
+            "requests": [{
+                "model": model,
+                "content": {"parts": [{"text": "probe"}]},
+                "taskType": "RETRIEVAL_QUERY",
+            }]
+        }
+        try:
+            pr = session.post(probe_url, params={"key": api_key}, json=probe_payload, timeout=10)
+            if pr.status_code == 429 and ("PerDay" in pr.text or "daily" in pr.text.lower() or "limit: 1000" in pr.text):
+                model = _FALLBACK_GEMINI_MODEL
+        except Exception:
+            pass
+
+        embed_url = f"https://generativelanguage.googleapis.com/v1beta/{model}:batchEmbedContents"
+        payload = {
+            "requests": [{
+                "model": model,
+                "content": {"parts": [{"text": query}]},
+                "taskType": "RETRIEVAL_QUERY",
+            }]
+        }
+
+        for attempt in range(8):
+            try:
+                resp = session.post(embed_url, params={"key": api_key}, json=payload, timeout=30)
+                if resp.status_code == 429:
+                    err_text = resp.text
+                    if model != _FALLBACK_GEMINI_MODEL and ("PerDay" in err_text or "limit: 1000" in err_text):
+                        model = _FALLBACK_GEMINI_MODEL
+                        embed_url = f"https://generativelanguage.googleapis.com/v1beta/{model}:batchEmbedContents"
+                        payload["requests"][0]["model"] = model
+                        continue
+
+                    wait = min(60, (2 ** attempt) * 2 + 3)
+                    try:
+                        err_json = resp.json()
+                        for detail in err_json.get("error", {}).get("details", []):
+                            delay_str = detail.get("retryDelay", "")
+                            if delay_str.endswith("s"):
+                                wait = max(wait, int(float(delay_str[:-1])) + 1)
+                    except Exception:
+                        pass
+                    logger.warning("Gemini query embed rate limit (429), attempt %d/8 — sleeping %ds", attempt + 1, wait)
+                    time.sleep(wait)
+                    continue
+
+                if not resp.ok:
+                    raise ValueError(f"HTTP {resp.status_code}: {resp.text[:200]}")
+
+                data = resp.json()
+                return data["embeddings"][0]["values"]
+            except Exception as exc:
+                wait = min(60, 2 ** attempt + 2)
+                logger.warning("Gemini query embed attempt %d/8 failed: %s — retrying in %ds", attempt + 1, exc, wait)
+                time.sleep(wait)
+
+        raise RuntimeError("All retries failed to generate query embedding via Gemini API.")
+
+    raise ValueError(f"Unknown EMBEDDING_BACKEND={backend!r}. Choose 'gemini' or 'local'.")
+
