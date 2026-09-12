@@ -14,6 +14,7 @@ Verifies:
 import os
 import sys
 from pathlib import Path
+import pytest
 
 # Force UTF-8 output on Windows
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
@@ -42,13 +43,20 @@ from retrieval_storage_2.retrieval import (
 )
 
 
-def test_real_chunks_loading_and_schema():
-    """Verify Person 1's real chunks.json loads into Person 2 with 3072-dim embeddings."""
+def _real_chunks_path() -> Path:
+    """Return an optional generated Person 1 artifact, or skip clean clones."""
     click_path = ROOT_DIR / "output" / "chunks.json"
     backup_path = ROOT_DIR / "output" / "backup_chunks.json"
+    if click_path.exists():
+        return click_path
+    if backup_path.exists():
+        return backup_path
+    pytest.skip("Generated output/chunks.json is not tracked; run the ingestion pipeline to enable this artifact test.")
 
-    target_path = click_path if click_path.exists() else backup_path
-    assert target_path.exists(), f"Neither {click_path} nor {backup_path} exists! Run pipeline first."
+
+def test_real_chunks_loading_and_schema():
+    """Verify Person 1's real chunks.json loads into Person 2 with 3072-dim embeddings."""
+    target_path = _real_chunks_path()
 
     print(f"\n[Test] Testing loading against real Person 1 output: {target_path.name}")
     retriever = CodebaseRetriever()
@@ -70,9 +78,7 @@ def test_real_chunks_loading_and_schema():
 
 def test_search_retrieval_accuracy():
     """Verify semantic search ranking on real chunks returns accurate results matching Person 3 contract."""
-    click_path = ROOT_DIR / "output" / "chunks.json"
-    backup_path = ROOT_DIR / "output" / "backup_chunks.json"
-    target_path = click_path if click_path.exists() else backup_path
+    target_path = _real_chunks_path()
 
     retriever = init_retriever(str(target_path))
     is_click = "chunks.json" == target_path.name
