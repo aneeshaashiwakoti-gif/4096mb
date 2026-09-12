@@ -20,8 +20,9 @@ export function renderFixPage() {
     <div class="page-header">
       <div class="row" style="justify-content: space-between;">
         <div>
-          <h1 class="page-title">Fix Proposals</h1>
-          <p class="page-subtitle">Non-destructive, citation-backed safe code rewrites</p>
+          <p class="eyebrow">CONSTRAINED CHANGE PROPOSAL</p>
+          <h1 class="page-title">Safe fix proposal</h1>
+          <p class="page-subtitle">Describe the fix and pin the constraints it must respect. Sentinel returns a cited proposal before anything is applied.</p>
         </div>
         <div class="row">
           <button class="btn btn-secondary" id="btn-load-demo-fix">${icons.sparkle} Load Demo</button>
@@ -33,7 +34,7 @@ export function renderFixPage() {
     <div class="grid-2">
       <div class="card card-lg">
         <div class="card-header">
-          <span class="card-heading">Fix Request Parameters</span>
+          <span class="card-heading">Fix instruction</span>
           <span class="ai-indicator">${icons.sparkle} Safe Rewrite</span>
         </div>
 
@@ -51,7 +52,7 @@ export function renderFixPage() {
 
           <div class="grid-2" style="gap: var(--space-4);">
             <div class="input-group">
-              <label class="input-label" for="fix-target-file">Target File (optional)</label>
+              <label class="input-label" for="fix-target-file">Target file</label>
               <input
                 type="text"
                 class="input"

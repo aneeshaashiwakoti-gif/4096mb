@@ -77,6 +77,10 @@ export const api = {
     return request('GET', `/projects/files${q}`);
   },
 
+  indexStatus() {
+    return request('GET', '/projects/index/status');
+  },
+
   /** GET /projects/file/content */
   readFile(filePath) {
     return request('GET', `/projects/file/content?path=${encodeURIComponent(filePath)}`);

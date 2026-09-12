@@ -5,11 +5,10 @@
 import { icons } from '../icons.js';
 
 export const navItems = [
-  { id: 'dashboard', path: '#/dashboard', label: 'Dashboard', icon: icons.dashboard },
-  { id: 'impact', path: '#/impact', label: 'Impact Analysis', icon: icons.impact },
-  { id: 'ask', path: '#/ask', label: 'Ask Sentinel', icon: icons.ask },
-  { id: 'fix', path: '#/fix', label: 'Fix Proposals', icon: icons.fix },
-  { id: 'validation', path: '#/validation', label: 'Validation', icon: icons.validate },
+  { id: 'dashboard', path: '#/dashboard', label: 'Overview', icon: icons.dashboard },
+  { id: 'ask', path: '#/ask', label: 'Ask', icon: icons.ask },
+  { id: 'impact', path: '#/impact', label: 'Impact', icon: icons.impact },
+  { id: 'fix', path: '#/fix', label: 'Fix', icon: icons.fix },
 ];
 
 export function renderSidebar(currentPath = '#/dashboard') {
@@ -20,25 +19,24 @@ export function renderSidebar(currentPath = '#/dashboard') {
       const isActive = normPath.startsWith(item.path);
       return `
         <a href="${item.path}" class="sidebar-item ${isActive ? 'active' : ''}" data-nav="${item.id}" aria-label="${item.label}">
-          ${item.icon}
-          <span class="sidebar-tooltip">${item.label}</span>
+          <span>${item.label}</span>
         </a>
       `;
     })
     .join('');
 
   return `
-    <aside class="sidebar" id="app-sidebar">
+    <header class="sidebar" id="app-sidebar">
       <a href="#/dashboard" class="sidebar-logo" title="Sentinel — Codebase Intelligence" aria-label="Sentinel Logo">
-        ${icons.sentinel}
+        ${icons.sentinel}<span>SENTINEL</span>
       </a>
       <nav class="sidebar-nav" aria-label="Main Navigation">
         ${navLinks}
       </nav>
       <div class="sidebar-bottom">
-        <div class="sidebar-status" id="sidebar-status-dot" title="Backend: Checking status..."></div>
+        <div class="sidebar-status" id="sidebar-status-dot" title="Backend: Checking status..."></div><span>LIVE</span>
       </div>
-    </aside>
+    </header>
   `;
 }
 

@@ -23,8 +23,9 @@ export function renderImpactPage() {
     <div class="page-header">
       <div class="row" style="justify-content: space-between;">
         <div>
-          <h1 class="page-title">Impact Analysis</h1>
-          <p class="page-subtitle">Explain code change impact with deterministic risk scoring</p>
+          <p class="eyebrow">STRUCTURAL BLAST RADIUS</p>
+          <h1 class="page-title">Impact analysis &amp; blast radius</h1>
+          <p class="page-subtitle">Describe a change and Sentinel walks the dependency graph to identify downstream contracts and affected code.</p>
         </div>
         <div class="row">
           <button class="btn btn-secondary" id="btn-load-demo-impact">${icons.sparkle} Load Demo</button>
@@ -36,11 +37,11 @@ export function renderImpactPage() {
     <div class="grid-2">
       <div class="card card-lg">
         <div class="card-header">
-          <span class="card-heading">Input — Change Context</span>
+          <span class="card-heading">Proposed change</span>
           <span class="ai-indicator">${icons.sparkle} AI-Grounded</span>
         </div>
         <div class="input-group" style="margin-bottom: var(--space-4);">
-          <label class="input-label">Payload (JSON)</label>
+          <label class="input-label">CHANGE EVIDENCE (JSON)</label>
           <textarea class="input" id="impact-input" rows="18" placeholder='Paste the ImpactAnalysisInput JSON...' style="font-family: var(--font-code); font-size: var(--text-code); min-height: 360px;"></textarea>
         </div>
       </div>

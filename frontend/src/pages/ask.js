@@ -18,11 +18,12 @@ import {
 
 export function renderAskPage() {
   return `
-    <div class="page-header">
+    <div class="page-header ask-page-header">
       <div class="row" style="justify-content: space-between;">
         <div>
-          <h1 class="page-title">Ask Sentinel</h1>
-          <p class="page-subtitle">Repository-grounded developer assistant with citation-backed reasoning</p>
+          <p class="eyebrow">RETRIEVAL · EVIDENCE · REASONING</p>
+          <h1 class="page-title">Semantic code search</h1>
+          <p class="page-subtitle">Query the indexed repository in plain language. Every answer is grounded in retrieved chunks with verifiable file and line citations.</p>
         </div>
         <div class="row">
           <button class="btn btn-secondary" id="btn-load-demo-ask">${icons.sparkle} Load Demo</button>
@@ -33,18 +34,18 @@ export function renderAskPage() {
     <div class="grid-2">
       <div class="card card-lg">
         <div class="card-header">
-          <span class="card-heading">Query & Grounding Context</span>
+          <span class="card-heading">Ask the connected repository</span>
           <span class="ai-indicator">${icons.sparkle} Grounded Q&A</span>
         </div>
 
         <div class="stack" style="gap: var(--space-4);">
           <div class="input-group">
-            <label class="input-label" for="ask-question">Developer Question</label>
+            <label class="input-label" for="ask-question">QUESTION</label>
             <textarea
               class="input"
               id="ask-question"
               rows="3"
-              placeholder="e.g. Why does payment.py break after the cart.py change?"
+              placeholder="Ask about any function, dependency, or behaviour…"
               style="min-height: 80px;"
             ></textarea>
           </div>
@@ -59,7 +60,7 @@ export function renderAskPage() {
           </div>
 
           <div class="input-group">
-            <label class="input-label" for="ask-context">Impact Context (JSON, optional)</label>
+            <label class="input-label" for="ask-context">ADVANCED: IMPACT CONTEXT JSON (OPTIONAL)</label>
             <textarea
               class="input"
               id="ask-context"

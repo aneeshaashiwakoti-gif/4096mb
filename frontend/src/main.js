@@ -9,9 +9,11 @@ import './styles/base.css';
 import './styles/components.css';
 import './styles/layout.css';
 import './styles/workspace.css';
+import './styles/reference-ui.css';
 
 import { renderSidebar, updateSidebarActive } from './components/sidebar.js';
 import { renderIde, initIde } from './pages/ide.js';
+import { renderDashboard, initDashboard } from './pages/dashboard.js';
 import { renderImpactPage, initImpactPage } from './pages/impact.js';
 import { renderAskPage, initAskPage } from './pages/ask.js';
 import { renderFixPage, initFixPage } from './pages/fix.js';
@@ -19,9 +21,9 @@ import { renderValidationPage, initValidationPage } from './pages/validation.js'
 import { api } from './api.js';
 
 const routes = {
-  '': { render: renderIde, init: initIde },
-  '#/': { render: renderIde, init: initIde },
-  '#/dashboard': { render: renderIde, init: initIde },
+  '': { render: renderDashboard, init: initDashboard },
+  '#/': { render: renderDashboard, init: initDashboard },
+  '#/dashboard': { render: renderDashboard, init: initDashboard },
   '#/impact': { render: renderImpactPage, init: initImpactPage },
   '#/ask': { render: renderAskPage, init: initAskPage },
   '#/fix': { render: renderFixPage, init: initFixPage },
