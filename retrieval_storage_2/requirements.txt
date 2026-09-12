@@ -1,0 +1,13 @@
+# Core
+numpy>=1.24.0
+pydantic>=2.0.0
+pytest>=7.0.0
+
+# Gemini backend (REST calls in EmbeddingProvider._embed_gemini_query,
+# mirrors Person 1's embedder.py -- no SDK needed, just requests)
+requests>=2.31.0
+
+# Local backend (mirrors Person 1's embedder.py local fallback exactly:
+# sentence-transformers "all-MiniLM-L6-v2")
+sentence-transformers>=3.0.0
+torch>=2.0.0

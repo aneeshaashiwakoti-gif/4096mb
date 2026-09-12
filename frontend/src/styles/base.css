@@ -1,0 +1,114 @@
+/* ═══════════════════════════════════════════════
+   SENTINEL — BASE STYLES
+   ═══════════════════════════════════════════════ */
+
+body {
+  font-family: var(--font-primary);
+  font-size: var(--text-body);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg);
+  line-height: var(--leading-relaxed);
+}
+
+/* ── Typography ── */
+
+.page-title {
+  font-size: var(--text-page-title);
+  font-weight: var(--weight-semi);
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.page-subtitle {
+  font-size: var(--text-body);
+  color: var(--color-text-secondary);
+  font-weight: var(--weight-normal);
+  margin-top: var(--space-2);
+}
+
+.section-heading {
+  font-size: var(--text-section);
+  font-weight: var(--weight-semi);
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.card-heading {
+  font-size: var(--text-card-heading);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.metric {
+  font-size: var(--text-metric);
+  font-weight: var(--weight-semi);
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+  font-size: var(--text-secondary);
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+}
+
+.text-body {
+  font-size: var(--text-body);
+  color: var(--color-text-primary);
+  line-height: var(--leading-relaxed);
+}
+
+/* ── Code ── */
+
+code, .code {
+  font-family: var(--font-code);
+  font-size: var(--text-code);
+  background: var(--color-bg);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+}
+
+pre {
+  font-family: var(--font-code);
+  font-size: var(--text-code);
+  line-height: var(--leading-relaxed);
+  overflow-x: auto;
+}
+
+/* ── Links ── */
+
+a.link, .text-link {
+  color: var(--color-accent);
+  transition: color var(--transition-fast);
+}
+
+a.link:hover, .text-link:hover {
+  color: var(--color-accent-hover);
+}
+
+/* ── Utility ── */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

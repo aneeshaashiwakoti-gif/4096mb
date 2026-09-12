@@ -1,0 +1,44 @@
+[
+  {
+    "chunk_id": "chunk_auth_01",
+    "file_path": "src/auth/jwt.py",
+    "start_line": 1,
+    "end_line": 28,
+    "text": "import jwt\nfrom datetime import datetime, timedelta\n\nSECRET_KEY = 'supersecretkey'\nALGORITHM = 'HS256'\n\ndef create_access_token(data: dict, expires_delta: timedelta = None):\n    to_encode = data.copy()\n    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))\n    to_encode.update({'exp': expire})\n    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)\n\ndef verify_token(token: str):\n    try:\n        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])\n        return payload\n    except jwt.PyJWTError:\n        return None"
+  },
+  {
+    "chunk_id": "chunk_auth_02",
+    "file_path": "src/auth/middleware.py",
+    "start_line": 10,
+    "end_line": 35,
+    "text": "from fastapi import Request, HTTPException\nfrom .jwt import verify_token\n\nasync def auth_middleware(request: Request):\n    auth_header = request.headers.get('Authorization')\n    if not auth_header or not auth_header.startswith('Bearer '):\n        raise HTTPException(status_code=401, detail='Missing or invalid authorization header')\n    token = auth_header.split(' ')[1]\n    user_data = verify_token(token)\n    if not user_data:\n        raise HTTPException(status_code=401, detail='Invalid or expired token')\n    request.state.user = user_data"
+  },
+  {
+    "chunk_id": "chunk_db_01",
+    "file_path": "src/database/connection.py",
+    "start_line": 1,
+    "end_line": 25,
+    "text": "import sqlite3\nfrom contextlib import contextmanager\n\nDATABASE_URL = 'app.db'\n\n@contextmanager\ndef get_db():\n    conn = sqlite3.connect(DATABASE_URL)\n    conn.row_factory = sqlite3.Row\n    try:\n        yield conn\n    finally:\n        conn.commit()\n        conn.close()"
+  },
+  {
+    "chunk_id": "chunk_users_01",
+    "file_path": "src/routes/users.py",
+    "start_line": 15,
+    "end_line": 42,
+    "text": "from fastapi import APIRouter, Depends, HTTPException\nfrom ..database.connection import get_db\n\nrouter = APIRouter(prefix='/users', tags=['users'])\n\n@router.post('/register')\ndef register_user(username: str, password_hash: str):\n    with get_db() as db:\n        existing = db.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()\n        if existing:\n            raise HTTPException(status_code=400, detail='User already exists')\n        db.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password_hash))\n        return {'status': 'success', 'message': 'User registered'}"
+  },
+  {
+    "chunk_id": "chunk_payment_01",
+    "file_path": "src/billing/stripe_client.py",
+    "start_line": 5,
+    "end_line": 30,
+    "text": "import stripe\n\nstripe.api_key = 'sk_test_12345'\n\ndef process_payment(amount_cents: int, currency: str = 'usd', customer_id: str = None):\n    try:\n        charge = stripe.Charge.create(\n            amount=amount_cents,\n            currency=currency,\n            customer=customer_id,\n            description='Zyathon Subscription'\n        )\n        return {'success': True, 'charge_id': charge.id}\n    except stripe.error.CardError as e:\n        return {'success': False, 'error': str(e)}"
+  },
+  {
+    "chunk_id": "chunk_routes_01",
+    "file_path": "src/main.py",
+    "start_line": 1,
+    "end_line": 22,
+    "text": "from fastapi import FastAPI\nfrom src.routes.users import router as user_router\n\napp = FastAPI(title='Codebase Intelligence API')\napp.include_router(user_router)\n\n@app.get('/health')\ndef health_check():\n    return {'status': 'healthy', 'version': '1.0.0'}"
+  }
+]

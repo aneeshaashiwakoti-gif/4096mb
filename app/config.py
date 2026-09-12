@@ -21,9 +21,25 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
     OPENAI_TIMEOUT_SECONDS: float = 30.0
+    GEMINI_MODEL: str = "gemini-1.5-flash"
 
     # CORS settings (comma-separated string or list)
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
+
+    # Embedding settings
+    EMBEDDING_PROVIDER: str = "openai"  # "voyage", "openai", "gemini", "local"
+    VOYAGE_API_KEY: str = ""
+    VOYAGE_MODEL: str = "voyage-code-3"
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-large"
+    GEMINI_API_KEY: str = ""
+    GEMINI_EMBEDDING_MODEL: str = "models/gemini-embedding-001"
+    EMBEDDING_BATCH_SIZE: int = 100
+    EMBEDDING_CACHE_DB: str = "output/embedding_cache.db"
+    SYMBOL_INDEX_DB: str = "output/symbol_index.db"
+    VECTOR_STORE_DB: str = "output/vector_store.db"
+    # Enables Person 2's existing embedding retriever for the live project
+    # index. Disabled by default so a local project works offline.
+    VECTOR_RETRIEVAL_ENABLED: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",

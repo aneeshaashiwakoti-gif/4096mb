@@ -12,6 +12,7 @@ from app.reasoning.claim_verifier import ClaimVerifier
 from app.reasoning.fix_engine import FixEngine
 from app.reasoning.intent import IntentAnalyzer
 from app.utils.logging import logger
+from app.indexing.service import project_index
 
 router = APIRouter()
 
@@ -23,6 +24,14 @@ async def ask_assistant(
 ) -> AskResponse:
     """Answer developer questions strictly grounded in supplied repository evidence."""
     logger.info(f"Received developer inquiry: '{payload.question}'")
+
+    # The original contract still accepts caller-supplied evidence.  When the
+    # local agent has an index, enrich an empty request with retrieved code so
+    # the LLM remains a reasoning layer rather than a filesystem layer.
+    if not payload.evidence and project_index.connected:
+        payload.evidence = project_index.evidence_for_query(payload.question)
+        if payload.evidence:
+            payload.project_id = project_index.root.name
 
     all_evidence = list(payload.evidence)
     if payload.impact_context and payload.impact_context.evidence:

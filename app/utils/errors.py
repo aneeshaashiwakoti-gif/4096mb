@@ -78,19 +78,54 @@ class CitationVerificationException(CodeImpactException):
         )
 
 
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+
 def register_error_handlers(app: FastAPI) -> None:
     """Register uniform JSON error handlers on the FastAPI application."""
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+        # Preserve structured details from deliberately restricted routes (for
+        # example `/fix/apply`) while still exposing a readable `error` field.
+        detail = exc.detail
+        err_msg = detail if isinstance(detail, str) else str(detail)
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": err_msg,
+                "detail": detail,
+                "status_code": exc.status_code,
+            },
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        messages = []
+        for err in exc.errors():
+            loc = " -> ".join(str(l) for l in err.get("loc", []) if l != "body")
+            msg = err.get("msg", "Invalid value")
+            messages.append(f"{loc}: {msg}" if loc else msg)
+        err_msg = "; ".join(messages) if messages else "Invalid request data"
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={
+                "error": err_msg,
+                "detail": err_msg,
+                "status_code": 422,
+            },
+        )
 
     @app.exception_handler(CodeImpactException)
     async def codeimpact_exception_handler(request: Request, exc: CodeImpactException):
         return JSONResponse(
             status_code=exc.status_code,
             content={
-                "error": {
-                    "code": exc.code,
-                    "message": exc.message,
-                    "details": exc.details,
-                }
+                "error": exc.message,
+                "detail": exc.message,
+                "code": exc.code,
+                "details": exc.details,
             },
         )
 
@@ -99,10 +134,8 @@ def register_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
-                "error": {
-                    "code": "INTERNAL_SERVER_ERROR",
-                    "message": "An unexpected error occurred. Check server logs for details.",
-                    "details": {},
-                }
+                "error": str(exc) or "An unexpected error occurred. Check server logs for details.",
+                "detail": str(exc) or "An unexpected error occurred.",
+                "code": "INTERNAL_SERVER_ERROR",
             },
         )
